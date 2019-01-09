@@ -1,112 +1,185 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'photos.dart';
+import 'package:draggable_scrollbar/draggable_scrollbar.dart';
 
-void main() => runApp(MyApp());
+void main() => runApp(MaterialApp(
+      home: new MyApp(),
+    ));
 
-class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
+class MyApp extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
-      ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
+  _MyAppState createState() => new _MyAppState();
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
+class _MyAppState extends State<MyApp> {
+  var pathList = <AssetPathEntity>[];
+  ScrollController myScrollController = ScrollController();
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+    return new Scaffold(
+      appBar: new AppBar(
+        title: const Text('Plugin example app'),
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.settings_applications),
+            onPressed: _openSetting,
+          ),
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text('You have clicked the button this many times:',
-                style: TextStyle(
-                  color: Colors.red,
-                )),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.display1,
-            ),
-          ],
+      // body: new ListView.builder(
+      //   itemBuilder: _buildItem,
+      //   itemCount: pathList.length,
+      // ),
+      body: DraggableScrollbar.semicircle(
+        controller: myScrollController,
+        child: GridView.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+          ),
+          controller: myScrollController,
+          padding: EdgeInsets.zero,
+          itemBuilder: _buildItem,
+          itemCount: pathList.length,
+          // itemCount: 1000,
+          // itemBuilder: (context, index) {
+          //   return Container(
+          //     alignment: Alignment.center,
+          //     margin: EdgeInsets.all(2.0),
+          //     color: Colors.grey[300],
+          //   );
+          // },
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+        child: Icon(Icons.refresh),
+        onPressed: () async {
+          var result = await PhotoManager.requestPermission();
+          if (!(result == true)) {
+            print("未授予权限");
+            return;
+          }
+
+          print("wait scan");
+          List<AssetPathEntity> list =
+              await PhotoManager.getAssetPathList(hasVideo: true);
+
+          pathList.clear();
+          pathList.addAll(list);
+          setState(() {});
+
+          // var r = await ImagePicker.pickImages(source: ImageSource.gallery, numberOfItems: 10);
+          // print(r);
+        },
+      ),
+    );
+  }
+
+  Widget _buildItem(BuildContext context, int index) {
+    var data = pathList[index];
+    return _buildWithData(data);
+  }
+
+  Widget _buildWithData(AssetPathEntity data) {
+    return GestureDetector(
+      child: ListTile(
+        title: Text(data.name),
+      ),
+      onTap: () async {
+        var list = await data.assetList;
+        print("开启的相册为:${data.name} , 数量为 : ${list.length}");
+        List<AssetEntity> virtualList = List.from(list);
+        for (var i = 0; i < 10; i++) {
+          virtualList.addAll(list);
+        }
+        var page = PhotoPage(
+          pathEntity: data,
+          photos: virtualList,
+        );
+        Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => page));
+      },
+    );
+  }
+
+  // This is an example of how to build album preview.
+  Widget _buildHasPreviewItem(BuildContext context, int index) {
+    var data = pathList[index];
+    Widget widget = FutureBuilder<List<AssetEntity>>(
+      future: data.assetList,
+      builder:
+          (BuildContext context, AsyncSnapshot<List<AssetEntity>> snapshot) {
+        var assetList = snapshot.data;
+        if (assetList == null || assetList.isEmpty) {
+          return Container(
+            child: Text('$index'),
+          );
+        }
+        AssetEntity asset = assetList[0];
+        return _buildPreview(asset);
+      },
+    );
+    return widget;
+  }
+
+  Widget _buildPreview(AssetEntity asset) {
+    return FutureBuilder<Uint8List>(
+      future: asset.thumbDataWithSize(200, 200),
+      builder: (BuildContext context, AsyncSnapshot<Uint8List> snapshot) {
+        if (snapshot.data != null) {
+          return Image.memory(snapshot.data);
+        }
+        return Container();
+      },
+    );
+  }
+
+  void _openSetting() {
+    PhotoManager.openSetting();
+  }
+}
+
+class SemicircleDemo extends StatelessWidget {
+  static int numItems = 1000;
+
+  final ScrollController controller;
+
+  const SemicircleDemo({
+    Key key,
+    @required this.controller,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollbar.semicircle(
+      labelTextBuilder: (offset) {
+        final int currentItem = controller.hasClients
+            ? (controller.offset /
+                    controller.position.maxScrollExtent *
+                    numItems)
+                .floor()
+            : 0;
+
+        return Text("$currentItem");
+      },
+      labelConstraints: BoxConstraints.tightFor(width: 80.0, height: 30.0),
+      controller: controller,
+      child: GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 5,
+        ),
+        controller: controller,
+        padding: EdgeInsets.zero,
+        itemCount: numItems,
+        itemBuilder: (context, index) {
+          return Container(
+            alignment: Alignment.center,
+            margin: EdgeInsets.all(2.0),
+            color: Colors.grey[300],
+          );
+        },
+      ),
     );
   }
 }
